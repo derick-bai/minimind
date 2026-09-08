@@ -40,8 +40,10 @@ def main():
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
     parser.add_argument('--inference_rope_scaling', default=False, action='store_true', help="启用RoPE位置编码外推（4倍，仅解决位置编码问题）")
     parser.add_argument('--max_new_tokens', default=8192, type=int, help="最大生成长度（注意：并非模型实际长文本能力）")
-    parser.add_argument('--temperature', default=0.85, type=float, help="生成温度，控制随机性（0-1，越大越随机）")
-    parser.add_argument('--top_p', default=0.95, type=float, help="nucleus采样阈值（0-1）")
+    parser.add_argument('--temperature', default=0.85, type=float, help="采样温度，控制随机性（0-1，越大越随机）")
+    parser.add_argument('--top_p', default=0.95, type=float, help="采样时的nucleus阈值（0-1）")
+    parser.add_argument('--prompt_format', default='auto', type=str, choices=['auto', 'pretrain', 'chat'], help="输入格式（auto根据权重名称选择，pretrain使用纯文本续写，chat使用对话模板）")
+    parser.add_argument('--greedy', action='store_true', help="使用贪心解码，每一步选择概率最高的token")
     parser.add_argument('--open_thinking', default=0, type=int, help="是否开启自适应思考（0=否，1=是）")
     parser.add_argument('--historys', default=0, type=int, help="携带历史对话轮数（需为偶数，0表示不携带历史）")
     parser.add_argument('--show_speed', default=1, type=int, help="显示decode速度（tokens/s）")
@@ -61,16 +63,18 @@ def main():
     
     conversation = []
     model, tokenizer = init_model(args)
+    prompt_format = args.prompt_format if args.prompt_format != 'auto' else ('pretrain' if 'pretrain' in args.weight else 'chat')
     input_mode = int(input('[0] 自动测试\n[1] 手动输入\n'))
     streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
     
     prompt_iter = prompts if input_mode == 0 else iter(lambda: input('💬: '), '')
     for prompt in prompt_iter:
-        setup_seed(random.randint(0, 31415926))
+        if not args.greedy:
+            setup_seed(random.randint(0, 31415926))
         if input_mode == 0: print(f'💬: {prompt}')
         conversation = conversation[-args.historys:] if args.historys else []
         conversation.append({"role": "user", "content": prompt})
-        if 'pretrain' in args.weight:
+        if prompt_format == 'pretrain':
             inputs = tokenizer.bos_token + prompt
         else:
             inputs = tokenizer.apply_chat_template(conversation, tokenize=False, add_generation_prompt=True, open_thinking=bool(args.open_thinking))
@@ -79,12 +83,17 @@ def main():
 
         print('🧠: ', end='')
         st = time.time()
-        generated_ids = model.generate(
-            inputs=inputs["input_ids"], attention_mask=inputs["attention_mask"],
-            max_new_tokens=args.max_new_tokens, do_sample=True, streamer=streamer,
-            pad_token_id=tokenizer.pad_token_id, eos_token_id=tokenizer.eos_token_id,
-            top_p=args.top_p, temperature=args.temperature, repetition_penalty=1
-        )
+        generation_args = {
+            'max_new_tokens': args.max_new_tokens,
+            'do_sample': not args.greedy,
+            'streamer': streamer,
+            'pad_token_id': tokenizer.pad_token_id,
+            'eos_token_id': tokenizer.eos_token_id,
+            'repetition_penalty': 1
+        }
+        if not args.greedy:
+            generation_args.update(top_p=args.top_p, temperature=args.temperature)
+        generated_ids = model.generate(inputs=inputs["input_ids"], attention_mask=inputs["attention_mask"], **generation_args)
         response = tokenizer.decode(generated_ids[0][len(inputs["input_ids"][0]):], skip_special_tokens=True)
         conversation.append({"role": "assistant", "content": response})
         gen_tokens = len(generated_ids[0]) - len(inputs["input_ids"][0])
