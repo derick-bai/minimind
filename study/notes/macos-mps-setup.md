@@ -1,7 +1,7 @@
 # macOS and MPS setup notes
 
-Last checked: 2026-09-04  
-Repository commit: `6fc918beb68a0d8c40452338df6319fe168014ba`
+- Last checked: 2026-09-08
+- Repository commit: `8d9cac9a0e7a47167169922657911c77500cdd81`
 
 This note records what we know about running MiniMind on the Mac mini used for this study. Update it when the environment or upstream code changes.
 
@@ -9,7 +9,9 @@ This note records what we know about running MiniMind on the Mac mini used for t
 
 The machine is an Apple M2 Pro Mac mini with a 19-core GPU and 32 GB of unified memory.
 
-An isolated test environment used Python 3.10.20, PyTorch 2.6.0, Transformers 4.57.6, Datasets 3.6.0, and NumPy 1.26.4. PyTorch reported that MPS was built and available. The current dense MiniMind model, with 63,912,192 parameters, completed a forward pass, backward pass, and AdamW update on the MPS device.
+The repository-local `.venv` uses Python 3.10.20, PyTorch 2.6.0, Transformers 4.57.6, Datasets 3.6.0, and NumPy 1.26.4. It runs as native ARM64. PyTorch reports that MPS is built and available. A direct MPS check completed a forward pass, backward pass, and AdamW update. `uv pip check --python .venv/bin/python` found no dependency conflicts.
+
+The current dense MiniMind model, with 63,912,192 parameters, also completed a forward pass, backward pass, and AdamW update on the MPS device during the initial setup check.
 
 Synthetic one-step checks also completed with the repository's default tensor shapes:
 

@@ -2,7 +2,7 @@
 
 This note is the source of truth for the user's learning path through MiniMind and practical LLM training. Read it before giving learning guidance or planning an exercise. Update the current progress and next steps as the user works through the material.
 
-Current progress: 1. Get the concepts, selectively
+Current progress: 2. Run something tiny before studying the architecture
 
 ## 1. Get the concepts, selectively
 
@@ -21,7 +21,9 @@ For the first pass, skip tokenizer training, MoE, knowledge distillation, RL, di
 
 Use a tiny dataset and a reduced model, perhaps 2 layers, hidden size 128, sequence length 64 or 128. Run enough steps to see the loss move. Then generate text from the result. The lesson is the complete path through the system.
 
-The repository does not currently contain the training JSONL files or model weights, so those need to be downloaded or replaced with a small local learning dataset before running the scripts.
+Download only `pretrain_t2t_mini.jsonl` and `sft_t2t_mini.jsonl` for this stage. Start with a small subset of each so the first runs finish in minutes. Use the complete mini files after the commands, checkpoints, and generated output make sense. Other datasets belong to later stages.
+
+Skip experiment tracking for the first smoke run. The console prints the same loss and learning-rate values that the scripts send to SwanLab. Enable tracking when comparing multiple runs becomes useful.
 
 On this Mac, always pass `--device mps`. The current scripts otherwise choose CPU, and their `--dtype` option does not actually enable mixed precision on MPS. The details are recorded in [macos-mps-setup.md](macos-mps-setup.md).
 
