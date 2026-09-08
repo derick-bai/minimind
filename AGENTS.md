@@ -19,6 +19,7 @@ Read documentation selectively according to the task:
 
 - Start with this file for fork-specific working rules.
 - For learning guidance, study sessions, or hands-on exercises, read [the learning path](study/notes/learning-path.md) first. Keep its current progress and next steps up to date as the user works through the material.
+- For intentional changes to upstream code, read [the local implementation changes](study/notes/local-implementation-changes.md). Add an entry when a local code change affects behavior or maintenance, and reference the implementation commit.
 - Read the relevant files under `study/notes/` for decisions and findings from this fork. For macOS setup or MPS work, read [the macOS and MPS setup note](study/notes/macos-mps-setup.md).
 - Use `README.md` or `README_en.md` for upstream concepts, workflows, and background when needed.
 
