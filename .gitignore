@@ -8,3 +8,4 @@ dataset/*.jsonl
 out
 website/
 docs-minimind/
+checkpoints/

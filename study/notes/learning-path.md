@@ -2,7 +2,7 @@
 
 This note is the source of truth for the user's learning path through MiniMind and practical LLM training. Read it before giving learning guidance or planning an exercise. Update the current progress and next steps as the user works through the material.
 
-Current progress: 2. Run something tiny before studying the architecture
+Current progress: 4. Make one controlled SFT experiment
 
 ## 1. Get the concepts, selectively
 
@@ -19,6 +19,10 @@ For the first pass, skip tokenizer training, MoE, knowledge distillation, RL, di
 
 ## 2. Run something tiny before studying the architecture
 
+Status: completed on 2026-09-08.
+
+The toy pretraining run used 1,000 samples, 2 layers, hidden size 128, sequence length 128, and batch size 8. It completed 125 steps on MPS. Loss fell from 8.6455 at the first logged batch to 7.2238 at the final batch. The model-only and resume checkpoints loaded successfully. A short generation check produced punctuation and common-token fragments, which is expected from a 1.26M-parameter model trained on 1,000 examples for one epoch.
+
 Use a tiny dataset and a reduced model, perhaps 2 layers, hidden size 128, sequence length 64 or 128. Run enough steps to see the loss move. Then generate text from the result. The lesson is the complete path through the system.
 
 Download only `pretrain_t2t_mini.jsonl` and `sft_t2t_mini.jsonl` for this stage. Start with a small subset of each so the first runs finish in minutes. Use the complete mini files after the commands, checkpoints, and generated output make sense. Other datasets belong to later stages.
@@ -28,6 +32,8 @@ Skip experiment tracking for the first smoke run. The console prints the same lo
 On this Mac, always pass `--device mps`. The current scripts otherwise choose CPU, and their `--dtype` option does not actually enable mixed precision on MPS. The details are recorded in [macos-mps-setup.md](macos-mps-setup.md).
 
 ## 3. Read the code along the path data takes
+
+Status: completed on 2026-09-08.
 
 Inspect these files in this order:
 
@@ -49,15 +55,17 @@ The two dataset classes contain one especially useful lesson. Pretraining assign
 
 ## 4. Make one controlled SFT experiment
 
-Create a small conversation dataset with behavior you can recognize. For example, teach the model a fictional fact, a particular response format, or a narrow vocabulary.
+Create a small conversation dataset that teaches one recognizable behavior. Use several phrasings of a fictional fact and keep other phrasings out of the training data.
 
 Compare the same prompts:
 
-- Before SFT
-- After SFT
-- Against prompts absent from the training data
+- One exact training prompt
+- One held-out paraphrase
+- One unrelated prompt
 
-This makes overfitting, generalization, dataset quality, and catastrophic forgetting concrete. Those ideas stick much better after seeing a model confidently learn the wrong lesson from ten repetitive examples.
+Run all three prompts before and after SFT with the same chat template and deterministic generation. `eval_llm.py` treats weight names containing `pretrain` as plain-text completion models and other weight names as chat models. It also samples tokens with a new random seed for every prompt. Its default paths therefore cannot provide a controlled comparison. Use a small evaluation helper or add an explicit greedy-decoding option before interpreting the results.
+
+This toy model can demonstrate memorization, limited generalization, and sensitivity to wording. It has no useful general ability to forget, so defer the catastrophic-forgetting experiment until working with a capable base model.
 
 ## 5. Repeat the experiment with LoRA
 
