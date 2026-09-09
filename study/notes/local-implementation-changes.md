@@ -34,3 +34,15 @@ For a controlled before-and-after SFT comparison, pass the same model configurat
 ```
 
 Repeat the command with the SFT weight name after training. Use the same prompts in the same order. This procedure supports the controlled SFT exercise in [the learning path](learning-path.md).
+
+## Final gradient-accumulation update
+
+- Added: 2026-09-08
+- Implementation commit: `92ab7d0b7d000573379f2dcf3fa811eb56daafea` (`Fix final pretraining accumulation checkpoint`)
+- Changed file: [train_pretrain.py](../../trainer/train_pretrain.py)
+
+The upstream pretraining loop applied a trailing partial gradient-accumulation update after leaving the batch loop. The final checkpoint was saved inside the loop first, so a run whose batch count was not divisible by `--accumulation_steps` wrote weights and optimizer state that omitted the last update. Resuming a checkpoint saved at the end of the final epoch could not recover it because all batches were already marked complete.
+
+`train_pretrain.py` now treats the final batch as an optimizer-step boundary. It clips gradients, updates the model and optimizer, clears gradients, and then writes the end-of-epoch checkpoints. Complete accumulation groups behave as before. A short final group retains the upstream loss scaling by the configured accumulation count; this change only makes the completed update persistent.
+
+This matters for the scaled pretraining exercise in [the learning path](learning-path.md). Its 39,695 batches with accumulation 8 execute and persist 4,962 optimizer updates.
