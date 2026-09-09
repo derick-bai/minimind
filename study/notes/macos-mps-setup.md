@@ -1,7 +1,7 @@
 # macOS and MPS setup notes
 
-- Last checked: 2026-09-08
-- Repository commit: `8d9cac9a0e7a47167169922657911c77500cdd81`
+- Last checked: 2026-09-09
+- Repository commit: `e940a0ea3e21aa2d857c9066ca71b507ee82bb56`
 
 This note records what we know about running MiniMind on the Mac mini used for this study. Update it when the environment or upstream code changes.
 
@@ -21,6 +21,25 @@ Synthetic one-step checks also completed with the repository's default tensor sh
 | Full SFT | 16 | 768 | About 20.7 GiB |
 
 These checks prove that the dense model and the default shapes fit in memory. They do not predict full-run speed or rule out memory growth from data loading, caching, or later training stages.
+
+## Measured pretraining throughput
+
+A complete 30M-parameter pretraining run finished on MPS with these settings:
+
+| Setting | Value |
+| --- | ---: |
+| Model | 512 hidden size, 8 layers, 30,025,216 parameters |
+| Dataset | `pretrain_t2t_mini.jsonl`, 1,270,238 examples |
+| Batch and sequence length | 32 examples, 340 tokens |
+| Gradient accumulation | 8 batches |
+| Batches | 39,695 |
+| Persisted optimizer updates | 4,962 |
+| Wall time | 10 hours 36 minutes 35 seconds |
+| Mean throughput | 0.962 seconds per batch, 33.3 examples per second |
+| Model-only checkpoint | About 63.5 MiB |
+| Resumable checkpoint | About 292.7 MiB |
+
+The earlier synthetic benchmark predicted 10.5 compute hours, within about 1% of the measured wall time. For this model, batch size, sequence length, worker count, and software environment, a short synthetic training benchmark is a useful runtime estimator. Do not transfer that ratio directly to a different model size or to SFT, whose sequence length and data processing differ.
 
 ## Current device behavior
 

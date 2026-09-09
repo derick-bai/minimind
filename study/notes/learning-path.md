@@ -2,7 +2,7 @@
 
 This note is the source of truth for the user's learning path through MiniMind and practical LLM training. Read it before giving learning guidance or planning an exercise. Update the current progress and next steps as the user works through the material.
 
-Current progress: 6. Scale MiniMind with the complete mini datasets
+Current progress: Complete. Full SFT and larger-scale LoRA are optional follow-up experiments.
 
 ## 1. Get the concepts, selectively
 
@@ -159,12 +159,14 @@ The downloaded files are the complete mini datasets, not the larger main-branch 
 
 Use a 512-wide, 8-layer dense model for the first scaled run. It has 30,025,216 parameters, about 24 times as many as the toy model. A local full-precision MPS benchmark at pretraining batch size 32 and sequence length 340 averaged 0.951 seconds per synthetic batch. One pass over the mini pretraining dataset has 39,695 batches and executes 4,962 persisted optimizer updates with accumulation set to 8, giving a compute-only estimate of 10.5 hours. Budget about 12 to 15 hours after data loading and checkpoint overhead.
 
-Treat pretraining and SFT as separate gates:
+The scaled experiment used separate gates:
 
 1. Pretrain for one epoch and evaluate plain-text completion.
 2. Continue only if the checkpoint produces recognizable language rather than punctuation loops.
 3. Full-SFT that checkpoint for one epoch and evaluate chat behavior.
 4. Revisit LoRA only after the larger base can follow at least simple instructions.
+
+The first two gates are complete. The remaining gates are intentionally optional because the earlier toy experiments already demonstrated how full SFT and LoRA alter a base model. Running them again at this scale could improve output quality and provide more operational practice, but it is not required to complete the learning goals in this note.
 
 The matching SFT shape, batch size 16 and sequence length 768, averaged 1.234 seconds per synthetic MPS batch. The 905,718-example dataset has 56,608 batches and the same number of optimizer updates, giving a compute-only estimate of 19.4 hours. Budget roughly 22 to 27 hours for that stage. Both benchmarks included forward, backward, gradient clipping, and an AdamW update, but not JSON parsing, tokenization, data transfer, or checkpoint writes. Actual times remain estimates.
 
@@ -188,10 +190,63 @@ Use a distinct weight name so this run cannot overwrite the toy checkpoint. Run 
   --save_interval 1000
 ```
 
-This produces `out/pretrain_30m_512.pth` and a resumable checkpoint under `checkpoints/`. If the run stops after a checkpoint, repeat the same command with `--from_resume 1`. Do not add `--from_resume 1` when starting the run from scratch.
+This produced `out/pretrain_30m_512.pth` and a resumable checkpoint under `checkpoints/`. If a future run stops after a checkpoint, repeat the same command with `--from_resume 1`. Do not add `--from_resume 1` when starting a run from scratch.
 
-The local pretraining fix applies a trailing partial gradient-accumulation update before saving the end-of-epoch checkpoint. The planned run therefore persists its 4,962nd update. The implementation and its upstream behavior difference are recorded in [the local implementation changes](local-implementation-changes.md#final-gradient-accumulation-update).
+The local pretraining fix applies a trailing partial gradient-accumulation update before saving the end-of-epoch checkpoint. The completed run therefore persisted its 4,962nd update. The implementation and its upstream behavior difference are recorded in [the local implementation changes](local-implementation-changes.md#final-gradient-accumulation-update).
 
-After pretraining, evaluate `pretrain_30m` with hidden size 512 and 8 layers. Use plain-text completion first. Do not judge chat instruction following until after SFT.
+The scaled pretraining run completed on 2026-09-09. It processed all 39,695 batches in 38,194.85 seconds, or 10 hours 36 minutes 35 seconds. That is 0.962 seconds per batch and about 33.3 examples per second. The actual duration was within about 1% of the 10.5-hour synthetic estimate and faster than the conservative 12-to-15-hour budget.
 
-A later standard Hugging Face and PEFT exercise still makes sense. The scaled MiniMind path comes first because it preserves the from-scratch learning thread and provides a more capable local base for another LoRA experiment.
+The final logged loss was 2.1722. The retained terminal window contains 113 logged points from batch 28,500 onward; those losses range from 1.9762 to 2.5185 and average 2.2189. Each logged value represents one shuffled batch, so use the range only as evidence that late training remained finite and stable, not as a validation-loss measurement.
+
+The model-only checkpoint is about 63.5 MiB and the resumable checkpoint is about 292.7 MiB. Resume metadata records epoch 0, batch 39,695, one training process, and optimizer step 4,962. This confirms that the final partial accumulation update was persisted by the local trainer fix.
+
+The greedy plain-text evaluation of `pretrain_30m` is complete. The evaluator loaded the matching 512-wide, 8-layer architecture and used a 64-token generation limit without conversation history. All five Chinese prompts produced recognizable words, mostly grammatical sentences, and continuations related to the prompt. This passes the pretraining gate for moving toward SFT.
+
+Use these exact prompts for the greedy and sampled comparison:
+
+- `中国的首都是`
+- `人工智能是一种`
+- `春天来了，天气`
+- `水在零摄氏度时`
+- `为什么天空是蓝色的？`
+
+The greedy baseline used this command from the repository root:
+
+```bash
+.venv/bin/python eval_llm.py \
+  --weight pretrain_30m \
+  --hidden_size 512 \
+  --num_hidden_layers 8 \
+  --device mps \
+  --prompt_format pretrain \
+  --greedy \
+  --historys 0 \
+  --max_new_tokens 64 \
+  --show_speed 0
+```
+
+The outputs still have substantial repetition and factual errors. The Beijing completion repeats a nonsensical coast claim, the artificial-intelligence completion repeats clauses, the spring completion loops the same sentence, and the water completion is confused. The sky explanation is broadly correct but begins to repeat its scattering explanation. Greedy decoding selects the highest-scoring token at every step, and the evaluator applies no repetition penalty, so this setup exposes phrase loops. The loops may come from both the small model and decoding method; they do not by themselves mean that pretraining failed.
+
+The sampled comparison kept the checkpoint and prompt format unchanged, removed `--greedy`, and used `--temperature 0.7 --top_p 0.9`:
+
+```bash
+.venv/bin/python eval_llm.py \
+  --weight pretrain_30m \
+  --hidden_size 512 \
+  --num_hidden_layers 8 \
+  --device mps \
+  --prompt_format pretrain \
+  --temperature 0.7 \
+  --top_p 0.9 \
+  --historys 0 \
+  --max_new_tokens 64 \
+  --show_speed 0
+```
+
+The sampled outputs were not better overall. The Beijing completion starts correctly, then claims that Beijing's capital is Tianjin and repeats it. The artificial-intelligence and spring completions remain repetitive. The water completion contains a malformed English expansion and loses factual coherence. The sky completion looks more like a direct answer, but incorrectly attributes scattering to water molecules and compares the wavelength of blue light with itself. This single stochastic run does not measure average sampling quality, but it establishes the intended lesson: sampling changes which continuations appear and can break some exact greedy loops, but it cannot repair knowledge and language patterns the checkpoint has not learned well.
+
+Do not spend more training time on this pretraining stage or tune decoding further for the current exercise. The base checkpoint produces recognizable, grammatical, topic-related Chinese text and should remain available as a baseline. A one-epoch run with `sft_t2t_mini.jsonl` remains available if a later question specifically calls for observing scaled SFT behavior.
+
+This MiniMind learning path is complete. It covered the main training concepts, code flow, controlled full-SFT and LoRA experiments on the toy model, a full mini-dataset pretraining run, checkpoint behavior, runtime estimation, and qualitative decoding comparisons. A scaled full-SFT or LoRA run would repeat mechanisms already observed at a larger scale, so neither is an unfinished requirement.
+
+A later project using an existing open-source pretrained model with Hugging Face and PEFT would add more new knowledge than another MiniMind run. It would introduce the practical adapter workflow used by hobby projects while reusing the concepts learned here.
