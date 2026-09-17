@@ -82,10 +82,26 @@ When reviewers return findings:
 	- there is anything that warrants the user's attention.
 - After fixing, resume the same reviewer subagent(s) for re-review and provide only the delta: what changed, which findings were addressed, and checks rerun.
 - Continue this review, fix, and re-review loop until there are no actionable findings or the user says to stop.
-- Summarize the issues fixed and include the summary in your task completion report.
 
 For later change sets:
 
 - Follow the same review process described above (for both the first-pass and the second-pass reviews).
 - Reuse prior reviewer subagents when continuity helps, and their context is still manageable. In this case, you don't need to provide the entire project context again, only the current change context.
 - Start fresh reviewer subagents when the change set is unrelated to previous work, the old context is stale due to recent changes, you notice deterioration in subagents' responses or too many context compactions, or just any reason that you think a fresh reviewer would be cleaner.
+
+## Task completion report
+
+Give the task completion report only after every review pass for the change set has finished, except when your task did not involve any changes (hence, no review is needed). Give it earlier when the user tells you to stop early or to report without an outstanding review or check, which applies when a reviewer never returned or a check hung. In that case, give the report for the work decided and done so far, and state which reviews and checks were left unfinished.
+
+Answering the user's questions and confirming decisions while the loop is open is allowed and is not a completion report. A pause to confirm under the rules above is still required while the loop is open.
+
+The report should cover the whole change set, not just the latest pass, including
+
+- summary of the work you completed and the checks you ran and their results,
+- any judgement calls you made, scope decisions and alternatives you chose not to pursue, with the reason for each, such as an optional piece you left out,
+- summary of the review findings that you addressed, including any you dismissed as not a real issue, with the reason,
+- the outstanding items, such as deferred work, known limitations, and anything the user should decide,
+- the recommended next steps, when applicable,
+- anything else that requires the user's attention.
+
+Do not rely on an earlier message to carry part of the account. A detail that matters belongs in the completion report even if you mentioned it earlier.
